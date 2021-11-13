@@ -35,6 +35,7 @@ func main() {
 	enode := rnode.AddChild("entry")
 	defer enode.WaitDisposed()
 	defer enode.Close()
+	enode.SetValue("hostname", getenv("PROXY_HOSTNAME", hostname()))
 	enode.SetValue("http", getenv("PROXY_HTTP_EP", ":80"))
 	enode.SetValue("https", getenv("PROXY_HTTPS_EP", ":443"))
 	enode.SetValue("dock", getenv("PROXY_DOCK_EP", "127.0.0.1:31623"))

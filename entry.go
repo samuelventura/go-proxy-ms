@@ -18,6 +18,7 @@ import (
 func entry(node tree.Node) {
 	crt := node.GetValue("server.crt").(string)
 	key := node.GetValue("server.key").(string)
+	hostname := node.GetValue("hostname").(string)
 	httpep := node.GetValue("http").(string)
 	httpsep := node.GetValue("https").(string)
 	dockep := node.GetValue("dock").(string)
@@ -50,7 +51,7 @@ func entry(node tree.Node) {
 	node.AddCloser("listen80", listen80.Close)
 	server80 := &http.Server{
 		Addr:    httpep,
-		Handler: &server80Dso{},
+		Handler: &server80Dso{hostname},
 	}
 	node.AddProcess("server80", func() {
 		err = server80.Serve(listen80)
@@ -76,7 +77,7 @@ func dockProxy(proxy, scheme, host, path string) *httputil.ReverseProxy {
 		Transport: &http.Transport{
 			Dial: func(network, addr string) (net.Conn, error) {
 				client := &http.Client{}
-				// SHIPNAME:PORT
+				// SHIP:PORT
 				parts := strings.SplitN(addr, ":", 2)
 				url := fmt.Sprintf("http://%s/api/ship/status/%s", proxy, parts[0])
 				resp, err := client.Get(url)
@@ -124,30 +125,27 @@ type server443Dso struct {
 }
 
 func (dso *server443Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
+	//log.Println(r.URL.String())
 	if strings.HasPrefix(r.URL.Path, "/proxy/") {
 		target := r.URL.Path[len("/proxy/"):]
-		// /SHIPNAME:PORT/PATH
+		// /SHIP:PORT/PATH
 		parts := strings.SplitN(target, "/", 2)
-		proxy := dockProxy(dso.proxy, r.URL.Scheme, parts[0], parts[1])
+		if len(parts) != 2 {
+			http.Error(w, "invalid path", 400)
+			return
+		}
+		proxy := dockProxy(dso.proxy, "https", parts[0], parts[1])
 		proxy.ServeHTTP(w, r)
 	} else {
 		dso.main.ServeHTTP(w, r)
 	}
 }
 
-type server80Dso struct{}
+type server80Dso struct {
+	hostname string
+}
 
 func (dso *server80Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Scheme {
-	case "http":
-		r.URL.Scheme = "https"
-	case "ws":
-		r.URL.Scheme = "wss"
-	default:
-		err := fmt.Sprintf("Unsupported schema: %s", r.URL)
-		http.Error(w, err, 400)
-		return
-	}
-	http.Redirect(w, r, r.URL.String(), http.StatusMovedPermanently)
+	url := fmt.Sprintf("https://%s%s", dso.hostname, r.URL.Path)
+	http.Redirect(w, r, url, http.StatusMovedPermanently)
 }

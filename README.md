@@ -3,10 +3,14 @@
 ## Test Drive
 
 ```bash
-ln -sf ~/github/go-proxy-ms/server.crt ~/go/bin/
-ln -sf ~/github/go-proxy-ms/server.key ~/go/bin/
+ln -sf ~/github/go-proxy-ms/server.crt ~/go/bin/go-proxy-ms.crt
+ln -sf ~/github/go-proxy-ms/server.key ~/go/bin/go-proxy-ms.key
 go install && ~/go/bin/go-proxy-ms
 tail /usr/local/bin/go-proxy-ms.out.log -n 10
+#as daemon
+curl -X POST http://127.0.0.1:31600/api/daemon/env/proxy \
+     -H "DaemonEnviron: PROXY_SERVER_CRT=$HOME/src/go-proxy-ms/server.crt" \
+     -H "DaemonEnviron: PROXY_SERVER_KEY=$HOME/src/go-proxy-ms/server.key" 
 ```
 
 ## Test Certificates

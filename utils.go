@@ -40,3 +40,11 @@ func withext(ext string) string {
 	file := base + "." + ext
 	return filepath.Join(dir, file)
 }
+
+func hostname() string {
+	host, err := os.Hostname()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return host
+}
