@@ -39,7 +39,7 @@ func main() {
 	enode.SetValue("http", getenv("PROXY_HTTP_EP", ":80"))
 	enode.SetValue("https", getenv("PROXY_HTTPS_EP", ":443"))
 	enode.SetValue("dock", getenv("PROXY_DOCK_EP", "127.0.0.1:31623"))
-	enode.SetValue("main", getenv("PROXY_MAIN_EP", "127.0.0.1:8080"))
+	enode.SetValue("main", getenv("PROXY_MAIN_URL", "http://127.0.0.1:8080/"))
 	enode.SetValue("server.crt", getenv("PROXY_SERVER_CRT", withext("crt")))
 	enode.SetValue("server.key", getenv("PROXY_SERVER_KEY", withext("key")))
 	entry(enode)

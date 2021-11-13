@@ -22,8 +22,7 @@ func entry(node tree.Node) {
 	httpep := node.GetValue("http").(string)
 	httpsep := node.GetValue("https").(string)
 	dockep := node.GetValue("dock").(string)
-	mainep := node.GetValue("main").(string)
-	mainulrs := fmt.Sprintf("http://%s/", mainep)
+	mainulrs := node.GetValue("main").(string)
 	mainulr, err := url.Parse(mainulrs)
 	if err != nil {
 		log.Fatal(err)
