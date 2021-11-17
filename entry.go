@@ -70,17 +70,18 @@ type StateDro struct {
 	IP   string
 }
 
-func dockProxy(target *url.URL, ships *StateDro) *httputil.ReverseProxy {
+func dockProxy(target *url.URL, ship *StateDro) *httputil.ReverseProxy {
+	log.Println("Scheme:", target.Scheme, "url:", target, "ship:", *ship)
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Path = target.Path
-		req.URL.Host = ships.Ship
+		req.URL.Host = ship.Ship
 	}
 	return &httputil.ReverseProxy{
 		Director: director,
 		Transport: &http.Transport{
 			Dial: func(network, addr string) (net.Conn, error) {
-				listen := fmt.Sprintf("%s:%d", ships.IP, ships.Port)
+				listen := fmt.Sprintf("%s:%d", ship.IP, ship.Port)
 				conn, err := net.DialTimeout("tcp", listen, 5*time.Second)
 				if err != nil {
 					return nil, err
@@ -111,19 +112,18 @@ type server443Dso struct {
 
 func (dso *server443Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/proxy/") {
+		// /proxy/SHIP/PATH
 		target_ep_path := r.URL.Path[len("/proxy/"):]
-		// /SHIP:PORT/PATH
-		target_parts := strings.SplitN(target_ep_path, "/", 2)
-		if len(target_parts) != 2 {
-			http.Error(w, "invalid target", 400)
-			return
+		if !strings.Contains(target_ep_path, "/") {
+			target_ep_path += "/"
 		}
-		if strings.Contains(target_parts[0], ":") {
+		target_parts := strings.SplitN(target_ep_path, "/", 2)
+		target_ship := target_parts[0]
+		target_path := "/" + target_parts[1]
+		if strings.Contains(target_ship, ":") {
 			http.Error(w, "port not supported", 400)
 			return
 		}
-		target_ship := target_parts[0]
-		target_path := target_parts[1]
 		ship_record, err := dso.dao.GetShip(target_ship)
 		if err != nil {
 			http.Error(w, "ship not found", 400)
@@ -162,6 +162,9 @@ func (dso *server443Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "url parse error", 400)
 			return
 		}
+		// log.Println("target_ep_path", target_ep_path)
+		// log.Println("target_path", target_path)
+		// log.Println("target_urls", target_urls)
 		dock_proxy := dockProxy(target_url, ship_state)
 		dock_proxy.ServeHTTP(w, r)
 	} else {
