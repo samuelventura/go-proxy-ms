@@ -16,6 +16,7 @@ import (
 )
 
 func entry(node tree.Node) {
+	dao := node.GetValue("dao").(Dao)
 	crt := node.GetValue("server.crt").(string)
 	key := node.GetValue("server.key").(string)
 	hostname := node.GetValue("hostname").(string)
@@ -35,7 +36,7 @@ func entry(node tree.Node) {
 	node.AddCloser("listen443", listen443.Close)
 	server443 := &http.Server{
 		Addr:    httpsep,
-		Handler: &server443Dso{mainrp, mainulr, dockep},
+		Handler: &server443Dso{mainrp, mainulr, dockep, dao},
 	}
 	node.AddProcess("server443", func() {
 		err = server443.ServeTLS(listen443, crt, key)
@@ -69,43 +70,22 @@ type StateDro struct {
 	IP   string
 }
 
-func dockProxy(proxy, scheme, host, path string) *httputil.ReverseProxy {
+func dockProxy(target *url.URL, ships *StateDro) *httputil.ReverseProxy {
 	director := func(req *http.Request) {
-		req.URL.Scheme = scheme
-		req.URL.Host = host
-		req.URL.Path = path
+		req.URL.Scheme = target.Scheme
+		req.URL.Path = target.Path
+		req.URL.Host = ships.Ship
 	}
 	return &httputil.ReverseProxy{
 		Director: director,
 		Transport: &http.Transport{
 			Dial: func(network, addr string) (net.Conn, error) {
-				client := &http.Client{}
-				// SHIP:PORT
-				parts := strings.SplitN(addr, ":", 2)
-				url := fmt.Sprintf("http://%s/api/ship/state/%s", proxy, parts[0])
-				resp, err := client.Get(url)
-				if err != nil {
-					return nil, err
-				}
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return nil, err
-				}
-				ship := &StateDro{}
-				err = json.Unmarshal(body, ship)
-				if err != nil {
-					return nil, err
-				}
-				if ship.Port < 0 {
-					err = fmt.Errorf("not available: %s", parts[0])
-					return nil, err
-				}
-				listen := fmt.Sprintf("%s:%d", ship.IP, ship.Port)
+				listen := fmt.Sprintf("%s:%d", ships.IP, ships.Port)
 				conn, err := net.DialTimeout("tcp", listen, 5*time.Second)
 				if err != nil {
 					return nil, err
 				}
-				header := fmt.Sprintf("127.0.0.1:%s\n", parts[1])
+				header := fmt.Sprintf("%s\n", target.Host)
 				n, err := conn.Write([]byte(header))
 				if err == nil && n != len(header) {
 					err = fmt.Errorf("write mismatch %d %d", len(header), n)
@@ -125,26 +105,65 @@ func dockProxy(proxy, scheme, host, path string) *httputil.ReverseProxy {
 type server443Dso struct {
 	mainReverse *httputil.ReverseProxy
 	mainURL     *url.URL
-	proxy       string
+	dockep      string
+	dao         Dao
 }
 
 func (dso *server443Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/proxy/") {
-
-		target := r.URL.Path[len("/proxy/"):]
+		target_ep_path := r.URL.Path[len("/proxy/"):]
 		// /SHIP:PORT/PATH
-		parts := strings.SplitN(target, "/", 2)
-		if len(parts) != 2 {
-			http.Error(w, "invalid path", 400)
+		target_parts := strings.SplitN(target_ep_path, "/", 2)
+		if len(target_parts) != 2 {
+			http.Error(w, "invalid target", 400)
 			return
 		}
-		if strings.Contains(parts[0], ":") {
+		if strings.Contains(target_parts[0], ":") {
 			http.Error(w, "port not supported", 400)
 			return
 		}
-		//http fixes por to 80
-		proxy := dockProxy(dso.proxy, "http", parts[0], parts[1])
-		proxy.ServeHTTP(w, r)
+		target_ship := target_parts[0]
+		target_path := target_parts[1]
+		ship_record, err := dso.dao.GetShip(target_ship)
+		if err != nil {
+			http.Error(w, "ship not found", 400)
+			return
+		}
+		if !ship_record.Enabled {
+			http.Error(w, "ship disabled", 400)
+			return
+		}
+		http_client := &http.Client{}
+		state_urlf := "http://%s/api/ship/state/%s"
+		state_url := fmt.Sprintf(state_urlf, dso.dockep, target_ship)
+		state_resp, err := http_client.Get(state_url)
+		if err != nil {
+			http.Error(w, "state get error", 400)
+			return
+		}
+		state_body, err := io.ReadAll(state_resp.Body)
+		if err != nil {
+			http.Error(w, "state read error", 400)
+			return
+		}
+		ship_state := &StateDro{}
+		err = json.Unmarshal(state_body, ship_state)
+		if err != nil {
+			http.Error(w, "state parse error", 400)
+			return
+		}
+		if ship_state.Port < 0 {
+			http.Error(w, "ship disabled", 400)
+			return
+		}
+		target_urls := fmt.Sprintf("%s%s", ship_record.Prefix, target_path)
+		target_url, err := url.Parse(target_urls)
+		if err != nil {
+			http.Error(w, "url parse error", 400)
+			return
+		}
+		dock_proxy := dockProxy(target_url, ship_state)
+		dock_proxy.ServeHTTP(w, r)
 	} else {
 		r.Host = dso.mainURL.Host
 		dso.mainReverse.ServeHTTP(w, r)

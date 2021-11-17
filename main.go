@@ -25,6 +25,11 @@ func main() {
 	defer rnode.WaitDisposed()
 	//recover closes as well
 	defer rnode.Recover()
+	rnode.SetValue("driver", getenv("PROXY_DB_DRIVER", "sqlite"))
+	rnode.SetValue("source", getenv("PROXY_DB_SOURCE", withext("db3")))
+	dao := NewDao(rnode) //close on root
+	rnode.AddCloser("dao", dao.Close)
+	rnode.SetValue("dao", dao)
 
 	spath := state.SingletonPath()
 	snode := state.Serve(rnode, spath)
@@ -43,6 +48,12 @@ func main() {
 	enode.SetValue("server.crt", getenv("PROXY_SERVER_CRT", withext("crt")))
 	enode.SetValue("server.key", getenv("PROXY_SERVER_KEY", withext("key")))
 	entry(enode)
+
+	anode := rnode.AddChild("api")
+	defer anode.WaitDisposed()
+	defer anode.Close()
+	anode.SetValue("endpoint", getenv("PROXY_API_EP", "127.0.0.1:31688"))
+	api(anode)
 
 	stdin := make(chan interface{})
 	go func() {

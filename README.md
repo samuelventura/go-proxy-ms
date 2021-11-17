@@ -1,5 +1,19 @@
 # go-proxy-ms
 
+## API
+
+```bash
+#ship management
+curl -X GET http://127.0.0.1:31688/api/ship/count
+curl -X GET http://127.0.0.1:31688/api/ship/count/enabled
+curl -X GET http://127.0.0.1:31688/api/ship/count/disabled
+curl -X GET http://127.0.0.1:31688/api/ship/info/:name
+curl -X POST http://127.0.0.1:31688/api/ship/add/:name?prefix=http://host:port/path
+curl -X POST http://127.0.0.1:31688/api/ship/remove/:name
+curl -X POST http://127.0.0.1:31688/api/ship/enable/:name
+curl -X POST http://127.0.0.1:31688/api/ship/disable/:name
+```
+
 ## Test Drive
 
 ```bash
@@ -11,6 +25,15 @@ tail /usr/local/bin/go-proxy-ms.out.log -n 10
 curl -X POST http://127.0.0.1:31600/api/daemon/env/proxy \
      -H "DaemonEnviron: PROXY_SERVER_CRT=$HOME/src/go-proxy-ms/server.crt" \
      -H "DaemonEnviron: PROXY_SERVER_KEY=$HOME/src/go-proxy-ms/server.key" 
+#ship management
+curl -X GET http://127.0.0.1:31688/api/ship/count
+curl -X GET http://127.0.0.1:31688/api/ship/count/enabled
+curl -X GET http://127.0.0.1:31688/api/ship/count/disabled
+curl -X GET http://127.0.0.1:31688/api/ship/info/demo
+curl -X POST http://127.0.0.1:31688/api/ship/add/demo?prefix=http://127.0.0.1:80
+curl -X POST http://127.0.0.1:31688/api/ship/remove/demo
+curl -X POST http://127.0.0.1:31688/api/ship/enable/demo
+curl -X POST http://127.0.0.1:31688/api/ship/disable/demo
 ```
 
 ## Test Certificates
