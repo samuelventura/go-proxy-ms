@@ -71,7 +71,6 @@ type StateDro struct {
 }
 
 func dockProxy(target *url.URL, ship *StateDro) *httputil.ReverseProxy {
-	log.Println("Scheme:", target.Scheme, "url:", target, "ship:", *ship)
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Path = target.Path
