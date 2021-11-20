@@ -79,6 +79,7 @@ func dockProxy(target *url.URL, ship *StateDro) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
 		Director: director,
 		Transport: &http.Transport{
+			IdleConnTimeout: 1 * time.Second,
 			Dial: func(network, addr string) (net.Conn, error) {
 				listen := fmt.Sprintf("%s:%d", ship.IP, ship.Port)
 				conn, err := net.DialTimeout("tcp", listen, 5*time.Second)
@@ -97,7 +98,6 @@ func dockProxy(target *url.URL, ship *StateDro) *httputil.ReverseProxy {
 				keepAlive(conn)
 				return conn, nil
 			},
-			TLSHandshakeTimeout: 5 * time.Second,
 		},
 	}
 }
