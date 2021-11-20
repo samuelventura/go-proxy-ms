@@ -40,12 +40,16 @@ func api(node tree.Node) {
 	})
 	skapi.POST("/add/:name", func(c *gin.Context) {
 		name := c.Param("name")
+		ship, ok := c.GetQuery("ship")
+		if !ok {
+			ship = name
+		}
 		prefix, ok := c.GetQuery("prefix")
 		if !ok {
 			c.JSON(400, "err: missing prefix param")
 			return
 		}
-		err := dao.AddShip(name, prefix)
+		err := dao.AddShip(name, ship, prefix)
 		if err != nil {
 			c.JSON(400, fmt.Sprintf("err: %v", err))
 			return

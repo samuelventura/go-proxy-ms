@@ -134,7 +134,7 @@ func (dso *server443Dso) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		http_client := &http.Client{}
 		state_urlf := "http://%s/api/ship/state/%s"
-		state_url := fmt.Sprintf(state_urlf, dso.dockep, target_ship)
+		state_url := fmt.Sprintf(state_urlf, dso.dockep, ship_record.Ship)
 		state_resp, err := http_client.Get(state_url)
 		if err != nil {
 			http.Error(w, "state get error", 400)

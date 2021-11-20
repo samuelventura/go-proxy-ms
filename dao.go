@@ -22,7 +22,7 @@ type Dao interface {
 	CountShips() int64
 	CountEnabledShips() int64
 	CountDisabledShips() int64
-	AddShip(name string, prefix string) error
+	AddShip(name string, ship string, prefix string) error
 	GetShip(name string) (*ShipDro, error)
 	EnableShip(name string, enabled bool) error
 }
@@ -102,10 +102,10 @@ func (dso *daoDso) CountDisabledShips() int64 {
 	return count
 }
 
-func (dso *daoDso) AddShip(name string, prefix string) error {
+func (dso *daoDso) AddShip(name string, ship string, prefix string) error {
 	dso.mutex.Lock()
 	defer dso.mutex.Unlock()
-	dro := &ShipDro{Name: name, Prefix: prefix}
+	dro := &ShipDro{Name: name, Ship: ship, Prefix: prefix}
 	result := dso.db.Create(dro)
 	return result.Error
 }

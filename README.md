@@ -8,7 +8,8 @@ curl -X GET http://127.0.0.1:31688/api/ship/count
 curl -X GET http://127.0.0.1:31688/api/ship/count/enabled
 curl -X GET http://127.0.0.1:31688/api/ship/count/disabled
 curl -X GET http://127.0.0.1:31688/api/ship/info/:name
-curl -X POST http://127.0.0.1:31688/api/ship/add/:name?prefix=http://host:port/path
+curl -X POST "http://127.0.0.1:31688/api/ship/add/:name?prefix=http://host:port/path"
+curl -X POST "http://127.0.0.1:31688/api/ship/add/:name?ship=name&prefix=http://host:port/path"
 curl -X POST http://127.0.0.1:31688/api/ship/remove/:name
 curl -X POST http://127.0.0.1:31688/api/ship/enable/:name
 curl -X POST http://127.0.0.1:31688/api/ship/disable/:name
@@ -31,6 +32,7 @@ curl -X GET http://127.0.0.1:31688/api/ship/count/enabled
 curl -X GET http://127.0.0.1:31688/api/ship/count/disabled
 curl -X GET http://127.0.0.1:31688/api/ship/info/demo
 curl -X POST http://127.0.0.1:31688/api/ship/add/demo?prefix=http://127.0.0.1:80
+curl -X POST http://127.0.0.1:31688/api/ship/add/demo?ship=demo1&prefix=http://127.0.0.1:80
 curl -X POST http://127.0.0.1:31688/api/ship/remove/demo
 curl -X POST http://127.0.0.1:31688/api/ship/enable/demo
 curl -X POST http://127.0.0.1:31688/api/ship/disable/demo
