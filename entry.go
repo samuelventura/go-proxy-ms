@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,7 +80,32 @@ func dockProxy(target *url.URL, ship *StateDro) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
 		Director: director,
 		Transport: &http.Transport{
+			// MaxIdleConns:        1,
+			// MaxConnsPerHost:     1,
+			// MaxIdleConnsPerHost: 1,
 			IdleConnTimeout: 1 * time.Second,
+			//DialContext has precedence over Dial, both left for completenes shake
+			DialContext: func(parent context.Context, network, addr string) (net.Conn, error) {
+				listen := fmt.Sprintf("%s:%d", ship.IP, ship.Port)
+				ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+				defer cancel()
+				var dialer = &net.Dialer{}
+				conn, err := dialer.DialContext(ctx, "tcp", listen)
+				if err != nil {
+					return nil, err
+				}
+				header := fmt.Sprintf("%s\n", target.Host)
+				n, err := conn.Write([]byte(header))
+				if err == nil && n != len(header) {
+					err = fmt.Errorf("write mismatch %d %d", len(header), n)
+				}
+				if err != nil {
+					conn.Close()
+					return nil, err
+				}
+				keepAlive(conn)
+				return conn, nil
+			},
 			Dial: func(network, addr string) (net.Conn, error) {
 				listen := fmt.Sprintf("%s:%d", ship.IP, ship.Port)
 				conn, err := net.DialTimeout("tcp", listen, 5*time.Second)
