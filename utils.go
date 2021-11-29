@@ -15,7 +15,7 @@ func keepAlive(conn net.Conn) {
 	err := tcpkeepalive.SetKeepAlive(
 		conn, 5*time.Second, 3, 1*time.Second)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 }
 
@@ -33,7 +33,7 @@ func getenv(name string, defval string) string {
 func withext(ext string) string {
 	exe, err := os.Executable()
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	dir := filepath.Dir(exe)
 	base := filepath.Base(exe)
@@ -44,7 +44,7 @@ func withext(ext string) string {
 func hostname() string {
 	host, err := os.Hostname()
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	return host
 }

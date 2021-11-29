@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samuelventura/go-tools"
 	"github.com/samuelventura/go-tree"
 )
 
@@ -20,20 +23,20 @@ func entry(node tree.Node) {
 	dao := node.GetValue("dao").(Dao)
 	crt := node.GetValue("server.crt").(string)
 	key := node.GetValue("server.key").(string)
-	hostname := node.GetValue("hostname").(string)
+	//hostname := node.GetValue("hostname").(string)
 	httpep := node.GetValue("http").(string)
 	httpsep := node.GetValue("https").(string)
 	dockep := node.GetValue("dock").(string)
 	mainurls := node.GetValue("main").(string)
-	mainurl, err := url.Parse(mainurls)
-	if err != nil {
-		log.Fatal(err)
+	httpsep_parts := strings.SplitN(httpsep, ":", 2)
+	if len(httpsep_parts) != 2 {
+		log.Panicf("httpsep must have 2 parts")
 	}
+	mainurl, err := url.Parse(mainurls)
+	tools.PanicIfError(err)
 	mainrp := httputil.NewSingleHostReverseProxy(mainurl)
 	listen443, err := net.Listen("tcp", httpsep)
-	if err != nil {
-		log.Fatal(err)
-	}
+	tools.PanicIfError(err)
 	node.AddCloser("listen443", listen443.Close)
 	server443 := &http.Server{
 		Addr:    httpsep,
@@ -45,21 +48,100 @@ func entry(node tree.Node) {
 			log.Println(httpsep, err)
 		}
 	})
+	count80 := newCount()
 	listen80, err := net.Listen("tcp", httpep)
-	if err != nil {
-		log.Fatal(err)
-	}
+	tools.PanicIfError(err)
 	node.AddCloser("listen80", listen80.Close)
-	server80 := &http.Server{
-		Addr:    httpep,
-		Handler: &server80Dso{hostname},
+	handleConn80 := func(node tree.Node, conn net.Conn) {
+		err := conn.SetDeadline(time.Now().Add(4 * time.Second))
+		tools.PanicIfError(err)
+		head, err := readLine(conn, 256)
+		if err != nil {
+			return
+		}
+		head_parts := strings.SplitN(head, " ", 3)
+		if len(head_parts) != 3 {
+			return
+		}
+		host := ""
+		path := head_parts[1]
+		for {
+			header, err := readLine(conn, 1024)
+			if err != nil {
+				return
+			}
+			if strings.HasPrefix(header, "Host:") {
+				host_header := strings.TrimSpace(header[5:])
+				host_parts := strings.SplitN(host_header, ":", 2)
+				if len(host_parts) < 1 {
+					return
+				}
+				host = fmt.Sprintf("%s:%s", host_parts[0], httpsep_parts[1])
+			}
+			if len(strings.TrimSpace(header)) == 0 {
+				writer := bufio.NewWriter(conn)
+				writer.WriteString("HTTP/1.1 301 Moved Permanently\r\n")
+				location_header := fmt.Sprintf("Location: https://%s%s\r\n", host, path)
+				writer.WriteString(location_header)
+				writer.WriteString("Content-Type: text/html; charset=utf-8\r\n")
+				writer.WriteString("Content-Length: 0\r\n")
+				writer.WriteString("\r\n")
+				writer.Flush()
+				return
+			}
+		}
+	}
+	setupConn80 := func(node tree.Node, conn net.Conn, id Id) {
+		defer node.IfRecoverCloser(conn.Close)
+		addr := conn.RemoteAddr().String()
+		cid := id.Next(addr)
+		child := node.AddChild(cid)
+		child.AddCloser("conn", conn.Close)
+		child.AddProcess("handler", func() {
+			log.Println("open80", count80.increment(), cid)
+			defer func() { log.Println("close80", count80.decrement(), cid) }()
+			handleConn80(child, conn)
+		})
 	}
 	node.AddProcess("server80", func() {
-		err = server80.Serve(listen80)
-		if err != nil {
-			log.Println(httpep, err)
+		id := NewId("proxy-" + listen80.Addr().String())
+		for {
+			conn80, err := listen80.Accept()
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			setupConn80(node, conn80, id)
 		}
 	})
+}
+
+func readLine(conn net.Conn, maxlen int) (string, error) {
+	bb := bytes.Buffer{}
+	b := []byte{0}
+	for {
+		n, err := conn.Read(b)
+		if err == nil && n != 1 {
+			err = fmt.Errorf("invalid read count %d", n)
+		}
+		if err != nil {
+			return bb.String(), err
+		}
+		n, err = bb.Write(b)
+		if err == nil && n != 1 {
+			err = fmt.Errorf("invalid write count %d", n)
+		}
+		if err != nil {
+			return bb.String(), err
+		}
+		if b[0] == '\n' {
+			return bb.String(), nil
+		}
+		if bb.Len() >= maxlen {
+			err = fmt.Errorf("line too long > %d", maxlen)
+			return bb.String(), err
+		}
+	}
 }
 
 type StateDro struct {

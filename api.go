@@ -76,7 +76,7 @@ func api(node tree.Node) {
 	})
 	listen, err := net.Listen("tcp", endpoint)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	node.AddCloser("listen", listen.Close)
 	port := listen.Addr().(*net.TCPAddr).Port

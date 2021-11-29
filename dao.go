@@ -46,11 +46,11 @@ func NewDao(node tree.Node) Dao {
 	dialector := dialector(node)
 	db, err := gorm.Open(dialector, config)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	err = db.AutoMigrate(&ShipDro{})
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	return &daoDso{&sync.Mutex{}, db}
 }
@@ -75,7 +75,7 @@ func (dso *daoDso) CountShips() int64 {
 	count := int64(0)
 	result := dso.db.Model(&ShipDro{}).Count(&count)
 	if result.Error != nil {
-		log.Fatal(result.Error)
+		log.Panic(result.Error)
 	}
 	return count
 }
@@ -86,7 +86,7 @@ func (dso *daoDso) CountEnabledShips() int64 {
 	count := int64(0)
 	result := dso.db.Model(&ShipDro{}).Where("enabled = ?", true).Count(&count)
 	if result.Error != nil {
-		log.Fatal(result.Error)
+		log.Panic(result.Error)
 	}
 	return count
 }
@@ -97,7 +97,7 @@ func (dso *daoDso) CountDisabledShips() int64 {
 	count := int64(0)
 	result := dso.db.Model(&ShipDro{}).Where("enabled != ?", true).Count(&count)
 	if result.Error != nil {
-		log.Fatal(result.Error)
+		log.Panic(result.Error)
 	}
 	return count
 }
