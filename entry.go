@@ -24,12 +24,12 @@ func entry(node tree.Node) {
 	httpep := node.GetValue("http").(string)
 	httpsep := node.GetValue("https").(string)
 	dockep := node.GetValue("dock").(string)
-	mainulrs := node.GetValue("main").(string)
-	mainulr, err := url.Parse(mainulrs)
+	mainurls := node.GetValue("main").(string)
+	mainurl, err := url.Parse(mainurls)
 	if err != nil {
 		log.Fatal(err)
 	}
-	mainrp := httputil.NewSingleHostReverseProxy(mainulr)
+	mainrp := httputil.NewSingleHostReverseProxy(mainurl)
 	listen443, err := net.Listen("tcp", httpsep)
 	if err != nil {
 		log.Fatal(err)
@@ -37,7 +37,7 @@ func entry(node tree.Node) {
 	node.AddCloser("listen443", listen443.Close)
 	server443 := &http.Server{
 		Addr:    httpsep,
-		Handler: &server443Dso{mainrp, mainulr, dockep, dao},
+		Handler: &server443Dso{mainrp, mainurl, dockep, dao},
 	}
 	node.AddProcess("server443", func() {
 		err = server443.ServeTLS(listen443, crt, key)
