@@ -1,22 +1,19 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
-	"os/signal"
 
 	"github.com/samuelventura/go-state"
+	"github.com/samuelventura/go-tools"
 	"github.com/samuelventura/go-tree"
 )
 
 func main() {
-	os.Setenv("GOTRACEBACK", "all")
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	log.SetOutput(os.Stdout)
+	tools.SetupLog()
 
-	ctrlc := make(chan os.Signal, 1)
-	signal.Notify(ctrlc, os.Interrupt)
+	ctrlc := tools.SetupCtrlc()
+	stdin := tools.SetupStdinAll()
 
 	log.Println("start", os.Getpid())
 	defer log.Println("exit")
@@ -25,41 +22,35 @@ func main() {
 	defer rnode.WaitDisposed()
 	//recover closes as well
 	defer rnode.Recover()
-	rnode.SetValue("driver", getenv("PROXY_DB_DRIVER", "sqlite"))
-	rnode.SetValue("source", getenv("PROXY_DB_SOURCE", withext("db3")))
+	rnode.SetValue("driver", tools.GetEnviron("PROXY_DB_DRIVER", "sqlite"))
+	rnode.SetValue("source", tools.GetEnviron("PROXY_DB_SOURCE", tools.WithExtension("db3")))
+	rnode.SetValue("state", tools.GetEnviron("PROXY_STATE", tools.WithExtension("state")))
 	dao := NewDao(rnode) //close on root
 	rnode.AddCloser("dao", dao.Close)
 	rnode.SetValue("dao", dao)
 
-	spath := state.SingletonPath()
-	snode := state.Serve(rnode, spath)
+	snode := state.Serve(rnode, rnode.GetValue("state").(string))
 	defer snode.WaitDisposed()
 	defer snode.Close()
-	log.Println("socket", spath)
 
 	enode := rnode.AddChild("entry")
 	defer enode.WaitDisposed()
 	defer enode.Close()
-	enode.SetValue("hostname", getenv("PROXY_HOSTNAME", hostname()))
-	enode.SetValue("http", getenv("PROXY_HTTP_EP", ":80"))
-	enode.SetValue("https", getenv("PROXY_HTTPS_EP", ":443"))
-	enode.SetValue("dock", getenv("PROXY_DOCK_EP", "127.0.0.1:31623"))
-	enode.SetValue("main", getenv("PROXY_MAIN_URL", "http://127.0.0.1:8080"))
-	enode.SetValue("server.crt", getenv("PROXY_SERVER_CRT", withext("crt")))
-	enode.SetValue("server.key", getenv("PROXY_SERVER_KEY", withext("key")))
+	enode.SetValue("hostname", tools.GetEnviron("PROXY_HOSTNAME", tools.GetHostname()))
+	enode.SetValue("http", tools.GetEnviron("PROXY_HTTP_EP", ":80"))
+	enode.SetValue("https", tools.GetEnviron("PROXY_HTTPS_EP", ":443"))
+	enode.SetValue("dock", tools.GetEnviron("PROXY_DOCK_EP", "127.0.0.1:31623"))
+	enode.SetValue("main", tools.GetEnviron("PROXY_MAIN_URL", "http://127.0.0.1:8080"))
+	enode.SetValue("server.crt", tools.GetEnviron("PROXY_SERVER_CRT", tools.WithExtension("crt")))
+	enode.SetValue("server.key", tools.GetEnviron("PROXY_SERVER_KEY", tools.WithExtension("key")))
 	entry(enode)
 
 	anode := rnode.AddChild("api")
 	defer anode.WaitDisposed()
 	defer anode.Close()
-	anode.SetValue("endpoint", getenv("PROXY_API_EP", "127.0.0.1:31688"))
+	anode.SetValue("endpoint", tools.GetEnviron("PROXY_API_EP", "127.0.0.1:31688"))
 	api(anode)
 
-	stdin := make(chan interface{})
-	go func() {
-		defer close(stdin)
-		ioutil.ReadAll(os.Stdin)
-	}()
 	select {
 	case <-rnode.Closed():
 	case <-snode.Closed():
